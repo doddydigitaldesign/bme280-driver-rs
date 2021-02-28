@@ -1,5 +1,9 @@
-use std::fmt::Pointer;
 
+use crate::{constants::{addresses::{BME280_CHIP_ID, BME280_CHIP_ID_ADDR, BME280_E_DEV_NOT_FOUND}, codes::BME280_OK}, structs::device::Bme280Dev};
+
+use super::registers::bme280_get_regs;
+
+#[derive(PartialEq)]
 pub enum Bme280Interface {
     /// SPI Interface
     Bme280SpiInterface,
@@ -7,135 +11,47 @@ pub enum Bme280Interface {
     Bme280I2cInterface,
 }
 
-pub struct Bme280Settings {
-    /// pressure oversampling 
-    osr_p: u8,
+/// This API is the entry point.
+/// It reads the chip-id and calibration data from the sensor.
+pub fn bme280_init(dev: &mut Bme280Dev) -> i8 {
+    let mut result: i8 = 0;
 
-    /// temperature oversampling 
-    osr_t: u8,
+    // Chip id read count
+    let try_count: u8 = 5;
+    let chip_id: u8 = 0;
 
-    /// humidity oversampling 
-    osr_h: u8,
+    while try_count != 0
+        {
+            // Read the chip-id of bme280 sensor
+            result = bme280_get_regs(BME280_CHIP_ID_ADDR, chip_id, 1, *dev);
 
-    /// filter coefficient 
-    filter: u8,
+            // Check for chip id validity
+            if (result == BME280_OK) && (chip_id == BME280_CHIP_ID)
+            {
+                dev.chip_id = chip_id;
 
-    /// standby time 
-    standby_time: u8,
+                // Reset the sensor 
+                result = bme280_soft_reset(dev);
+
+                if result == BME280_OK
+                {
+                    // Read the calibration data 
+                    result = get_calib_data(dev);
+                }
+
+                break;
+            }
+
+            // Wait for 1 ms 
+            dev.delay_us(1000, dev.interface_ptr);
+            try_count -= 1;
+        }
+
+        // Chip id check failed 
+        if !(try_count != 0)
+        {
+            result = BME280_E_DEV_NOT_FOUND;
+        }
+
+        result
 }
-
-pub struct Bme280CalibrationData {
-    /// Calibration coefficient for the temperature sensor
-    dig1: u16,
-
-    /// Calibration coefficient for the temperature sensor
-    dig2: i16,
-
-    /// Calibration coefficient for the temperature sensor
-    dig3: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p1: u16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p2: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p3: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p4: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p5: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p6: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p7: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p8: i16,
-
-    /// Calibration coefficient for the pressure sensor
-    dig_p9: i16,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h1: u8,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h2: i16,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h3: u8,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h4: i16,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h5: i16,
-
-    /// Calibration coefficient for the humidity sensor
-    dig_h6: i8,
-
-    /// Variable to store the intermediate temperature coefficient
-    t_fine: i32,
-}
-
-pub struct Bme280Dev {
-    /// Chip Id
-    chip_id: u8,
-    /// Interface function pointer used to enable the device address for I2C and chip selection for SPI
-    interface_ptr: *const dyn Pointer,
-
-    /// Interface selection
-    /// For SPI: Bme280SpiInterface
-    interface: Bme280Interface,
-
-    calibration_data: Bme280CalibrationData,
-    settings: Bme280Settings,
-    interface_result: i8,
-}
-
-impl Bme280Dev {
-    /// Bus communication function pointer which should be mapped to
-    /// the platform specific read functions of the user
-    /// * @param [in] reg_addr      :Register address from which data is read.
-    /// * @param [in] reg_data     : Pointer to data buffer where read data is stored.
-    /// * @param [in] len           : Number of bytes of data to be read.
-    /// * @param [in, out] intf_ptr : Void pointer that can enable the linking of descriptors
-    ///                               for interface related call backs
-    ///
-    /// * @retval   0   -> Success.
-    /// * @retval Non zero value -> Fail.
-    pub fn read(reg_addr: u8, reg_data: u8, len: u32, interface_ptr: usize) -> usize {
-        0
-    }
-    /// Bus communication function pointer which should be mapped to
-    /// the platform specific write functions of the user
-    ///
-    /// * @param [in] reg_addr      : Register address to which the data is written.
-    /// * @param [in] reg_data     : Pointer to data buffer in which data to be written
-    ///                            is stored.
-    /// * @param [in] len           : Number of bytes of data to be written.
-    /// * @param [in, out] intf_ptr : Void pointer that can enable the linking of descriptors
-    ///                            for interface related call backs
-    ///
-    /// * @retval   0   -> Success.
-    /// * @retval Non zero value -> Fail.
-    pub fn write(reg_addr: u8, reg_data: u8, len: u32, interface_ptr: usize) -> usize {
-        0
-    }
-    /// Delay function pointer which should be mapped to
-    /// delay function of the user
-    ///
-    /// * @param[in] period              : Delay in microseconds.
-    /// * @param[in, out] intf_ptr       : Void pointer that can enable the linking of descriptors
-    ///                                    for interface related call backs
-    /// * @retval Non zero value -> Fail.
-    pub fn delay(period: u32, interface_pointer: usize) -> usize {
-        0
-    }
-}
-pub fn bme280_init() {}
